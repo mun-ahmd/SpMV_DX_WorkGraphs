@@ -147,6 +147,7 @@
     <ClCompile Include="src\main-playground.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\ShaderCompiler.cpp" />
+    <ClCompile Include="src\SpMV_Application.cpp" />
     <ClCompile Include="src\Swapchain.cpp" />
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WorkGraph.cpp" />
@@ -155,11 +156,13 @@
     <ClInclude Include="include\Application.h" />
     <ClInclude Include="include\Device.h" />
     <ClInclude Include="include\ShaderCompiler.h" />
+    <ClInclude Include="include\SpMV_Application.h" />
     <ClInclude Include="include\Swapchain.h" />
     <ClInclude Include="include\Window.h" />
     <ClInclude Include="include\WorkGraph.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\README.md" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

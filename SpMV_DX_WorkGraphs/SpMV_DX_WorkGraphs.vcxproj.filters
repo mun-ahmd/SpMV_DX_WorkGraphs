@@ -63,6 +63,9 @@
     <ClCompile Include="imgui\backends\imgui_impl_dx12.cpp">
       <Filter>Source Files\Imgui</Filter>
     </ClCompile>
+    <ClCompile Include="src\SpMV_Application.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
@@ -83,8 +86,14 @@
     <ClInclude Include="include\WorkGraph.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\SpMV_Application.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="..\README.md">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

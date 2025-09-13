@@ -155,6 +155,8 @@ std::pair<ComPtr<IDxcBlob>, std::vector<std::string>> ShaderCompiler::CompileSha
         arguments.push_back(entryPoint);
     }
 
+    //modified by mun_ahmd: Do not include from tutorial folders, use custom import path
+    /*
     // Add include arguments for tutorial folders
     for (const auto& [tutorialFolder, _] : {TUTORIAL_FOLDER_LIST}) {
         // We look for the tutorial folder in the current working directory and next to the executable file.
@@ -168,6 +170,7 @@ std::pair<ComPtr<IDxcBlob>, std::vector<std::string>> ShaderCompiler::CompileSha
             }
         }
     }
+    */
 
     // Add define for software (WARP) adapter
     if (device_->IsSoftwareAdapter()) {
