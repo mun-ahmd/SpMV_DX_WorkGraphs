@@ -47,6 +47,28 @@ using Microsoft::WRL::ComPtr;
 // Helpers for D3D12 methods
 void ThrowIfFailed(HRESULT hr);
 
+#include <string>
+#include <Windows.h>
+
+inline static std::wstring Utf8ToWide(const std::string& utf8)
+{
+    if (utf8.empty()) return {};
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, utf8.data(), (int)utf8.size(), nullptr, 0);
+    std::wstring wide(wideLen, 0);
+    MultiByteToWideChar(CP_UTF8, 0, utf8.data(), (int)utf8.size(), wide.data(), wideLen);
+    return wide;
+}
+
+inline static std::string WideToUtf8(const std::wstring& wide)
+{
+    if (wide.empty()) return {};
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wide.data(), (int)wide.size(), nullptr, 0, nullptr, nullptr);
+    std::string utf8(utf8Len, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wide.data(), (int)wide.size(), utf8.data(), utf8Len, nullptr, nullptr);
+    return utf8;
+}
+
+
 class Device {
 public:
     static constexpr std::uint32_t BufferedFramesCount = 3;

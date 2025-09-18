@@ -73,7 +73,7 @@ private:
     // Util methods for shader resources
     void CreateResourceDescriptorHeaps();
     //modified by mun_ahmd: Methods for creating and uploading SpMV buffers
-    void CreateSpMVBuffers(uint32_t maxNumRows, uint32_t maxNumNonZeroes);
+    void CreateSpMVBuffers(uint32_t maxNumRows, uint32_t maxNumCols, uint32_t maxNumNonZeroes);
     //note: it is not really the most efficient to upload both CSR and vector separately since they write some length related meta info to a common buffer
     void UploadCSR(
         unsigned long long numRows,

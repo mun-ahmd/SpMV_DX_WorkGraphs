@@ -128,8 +128,7 @@ Device::Device(const bool forceWarpAdapter, const bool enableDebugLayer, const b
         softwareAdapter_ = desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE;
 
         // Convert adapter description to std::string
-        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-        adapterDescription_ = converter.to_bytes(desc.Description);
+        adapterDescription_ = WideToUtf8(desc.Description);
     } while (false);
 
     if (enableDebugLayer) {

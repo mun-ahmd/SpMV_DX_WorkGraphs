@@ -305,20 +305,12 @@ std::filesystem::path ShaderCompiler::GetShaderSourceFilePath(const std::wstring
 
 std::wstring ConvertStringToWString(const std::string_view str)
 {
-    std::wstring_convert<std::codecvt<wchar_t, char, mbstate_t>, wchar_t> converter;
-
-    const auto begin = &*str.cbegin();
-    const auto end   = begin + str.size();
-
-    return converter.from_bytes(begin, end);
+    std::string asString(str);
+    return Utf8ToWide(asString);
 }
 
 std::string ConvertWStringToString(const std::wstring_view str)
 {
-    std::wstring_convert<std::codecvt<wchar_t, char, mbstate_t>, wchar_t> converter;
-
-    const auto begin = &*str.cbegin();
-    const auto end   = begin + str.size();
-
-    return converter.to_bytes(begin, end);
+    std::wstring asWString(str);
+    return WideToUtf8(asWString);
 }

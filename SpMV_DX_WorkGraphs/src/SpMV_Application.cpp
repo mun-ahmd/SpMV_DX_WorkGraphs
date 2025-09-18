@@ -67,7 +67,7 @@ SpMV_Application::SpMV_Application(const Options& options) : workGraphTutorials_
 
     CreateResourceDescriptorHeaps();
     //modified by mun_ahmd: todo set better limits on buffer size
-    CreateSpMVBuffers(1000000, 100000);
+    CreateSpMVBuffers(100000, 100000, 100000);
     CreateWritableBackbuffer(swapchain_->GetWidth(), swapchain_->GetHeight());
     CreateScratchBuffer();
     CreatePersistentScratchBuffer();
@@ -316,6 +316,7 @@ void SpMV_Application::OnRender(ID3D12GraphicsCommandList10* commandList, const 
         commandList->SetComputeRootDescriptorTable(2, resourceDescriptorHeap_->GetGPUDescriptorHandleForHeapStart());
     }
 
+    //TODO: It won't work until i pass the input record from cpu to gpu (dispatch size)
     workGraph_->Dispatch(commandList);
 
     // Transistion writable backbuffer back to pixel shader resource
@@ -531,7 +532,7 @@ void SpMV_Application::DestroyImGuiContext()
 
 void SpMV_Application::CreateWorkGraphRootSignature()
 {
-    CD3DX12_DESCRIPTOR_RANGE descriptorRanges[2];
+    CD3DX12_DESCRIPTOR_RANGE descriptorRanges[2]{};
     descriptorRanges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0, 0, 0); // 4 SRVs -> t0–t3, starting at heap[0]
     descriptorRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0, 4); // 1 UAV -> u0, at heap[4]
 
@@ -601,7 +602,7 @@ void SpMV_Application::CreateResourceDescriptorHeaps()
     }
 }
 
-void SpMV_Application::CreateSpMVBuffers(uint32_t maxNumRows, uint32_t maxNumNonZeroes)
+void SpMV_Application::CreateSpMVBuffers(uint32_t maxNumRows, uint32_t maxNumCols, uint32_t maxNumNonZeroes)
 {
     // Reset all old resources
     readonlyCSR_rowPtr.Reset();
@@ -653,7 +654,7 @@ void SpMV_Application::CreateSpMVBuffers(uint32_t maxNumRows, uint32_t maxNumNon
     //
     // Dense vector input (float * numRows)
     //
-    UINT64 vecSize = sizeof(float) * maxNumRows;
+    UINT64 vecSize = sizeof(float) * maxNumCols;
     auto descVector = CD3DX12_RESOURCE_DESC::Buffer(vecSize);
     ThrowIfFailed(device->CreateCommittedResource(
         &defaultHeap,
@@ -915,10 +916,12 @@ void SpMV_Application::UploadCSR(
         data.SlicePitch = size;
 
         UpdateSubresources<1>(cmdList.Get(), readonlyCSR_rowPtr.Get(), upload.Get(), 0, 0, 1, &data);
-        cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
             readonlyCSR_rowPtr.Get(),
             D3D12_RESOURCE_STATE_COPY_DEST,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+        );
+        cmdList->ResourceBarrier(1, &barrier);
     }
 
     //
@@ -940,10 +943,12 @@ void SpMV_Application::UploadCSR(
         data.SlicePitch = size;
 
         UpdateSubresources<1>(cmdList.Get(), readonlyCSR_colIdx.Get(), upload.Get(), 0, 0, 1, &data);
-        cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
             readonlyCSR_colIdx.Get(),
             D3D12_RESOURCE_STATE_COPY_DEST,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+        );
+        cmdList->ResourceBarrier(1, &barrier);
     }
 
     //
@@ -965,10 +970,12 @@ void SpMV_Application::UploadCSR(
         data.SlicePitch = size;
 
         UpdateSubresources<1>(cmdList.Get(), readonlyCSR_values.Get(), upload.Get(), 0, 0, 1, &data);
-        cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
             readonlyCSR_values.Get(),
             D3D12_RESOURCE_STATE_COPY_DEST,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+        );
+        cmdList->ResourceBarrier(1, &barrier);
     }
 }
 
@@ -994,10 +1001,12 @@ void SpMV_Application::UploadVector(unsigned long long count, const float* value
     data.SlicePitch = size;
 
     UpdateSubresources<1>(cmdList.Get(), readonlyVector.Get(), upload.Get(), 0, 0, 1, &data);
-    cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         readonlyVector.Get(),
         D3D12_RESOURCE_STATE_COPY_DEST,
-        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+    );
+    cmdList->ResourceBarrier(1, &barrier);
 }
 
 

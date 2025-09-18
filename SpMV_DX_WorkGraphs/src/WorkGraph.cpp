@@ -25,7 +25,9 @@
 
 #include <iostream>
 
-#include "Application.h"
+#include "Device.h"
+#include "ShaderCompiler.h"
+#include "Window.h"
 #include "Swapchain.h"
 
 WorkGraph::WorkGraph(const Device*        device,
