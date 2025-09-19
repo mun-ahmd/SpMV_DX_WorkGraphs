@@ -28,7 +28,50 @@
 #include <imgui.h>
 
 #include <iostream>
+#include <fstream>
 #include <sstream>
+
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <cstdint>
+
+static SpMV_Application::CSRMatrix LoadCSRBinFile(const std::string& csrbinFilePath) {
+    SpMV_Application::CSRMatrix mat;
+    std::ifstream file(csrbinFilePath, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Could not open file " + csrbinFilePath);
+    }
+
+    // 1. Read dimensions
+    file.read(reinterpret_cast<char*>(&mat.nrows), sizeof(uint32_t));
+    file.read(reinterpret_cast<char*>(&mat.ncols), sizeof(uint32_t));
+
+    // 2. Read nnz
+    file.read(reinterpret_cast<char*>(&mat.nnz), sizeof(uint32_t));
+
+    // 3. Read indptr
+    mat.rowPtr.resize(mat.nrows + 1);
+    file.read(reinterpret_cast<char*>(mat.rowPtr.data()), (mat.nrows + 1) * sizeof(uint32_t));
+
+    // 4. Read indices
+    mat.colIdx.resize(mat.nnz);
+    file.read(reinterpret_cast<char*>(mat.colIdx.data()), mat.nnz * sizeof(uint32_t));
+
+    // 5. Read data
+    mat.values.resize(mat.nnz);
+    file.read(reinterpret_cast<char*>(mat.values.data()), mat.nnz * sizeof(float));
+
+    // 6. Read random_vector
+    mat.random_vector.resize(mat.ncols);
+    file.read(reinterpret_cast<char*>(mat.random_vector.data()), mat.ncols * sizeof(float));
+
+    // 7. Read mult_result
+    mat.mult_result.resize(mat.nrows);
+    file.read(reinterpret_cast<char*>(mat.mult_result.data()), mat.nrows * sizeof(float));
+
+    return mat;
+}
 
 SpMV_Application::SpMV_Application(const Options& options) : workGraphTutorials_(options.tutorials)
 {
@@ -82,6 +125,8 @@ SpMV_Application::SpMV_Application(const Options& options) : workGraphTutorials_
 
     CreateWorkGraphRootSignature();
     CreateWorkGraph();
+
+    UploadSpMV(LoadCSRBinFile("./matrices/1138_bus.csrbin"));
 }
 
 SpMV_Application::~SpMV_Application()
@@ -246,39 +291,37 @@ void SpMV_Application::OnRender(ID3D12GraphicsCommandList10* commandList, const 
     // Clear shader resources (writable backbuffer & scratch buffer)
     ClearShaderResources(commandList);
 
+    //modified by mun_ahmd: New root constants
     struct RootConstants {
-        unsigned width, height;
-        float    mouseX, mouseY;
-        unsigned inputState;
-        float    time;
+        uint32_t NumRows;
+        uint32_t NumNonZeros;     // number of non-zero entries
+        uint32_t VectorCount;     // length of input vector (usually NumCols)
+        uint32_t Dummy3;          // padding / reserved
+        uint32_t Dummy4;          // padding / reserved
+        uint32_t Dummy5;          // padding / reserved
     };
 
-    const auto& mousePos = ImGui::GetMousePos();
+    //const auto& mousePos = ImGui::GetMousePos();
 
     RootConstants constants = {
-        .width = swapchain_->GetWidth(),
-        .height = swapchain_->GetHeight(),
-        .mouseX = mousePos.x,
-        .mouseY = mousePos.y,
-        .inputState = 0,
-        .time = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::high_resolution_clock::now() -
-                                                                         startTime_)
-                    .count(),
+        .NumRows = this->activeSpMV.nrows,
+        .NumNonZeros = this->activeSpMV.nnz,
+        .VectorCount = this->activeSpMV.ncols
     };
 
-    // Compute input state
-    constants.inputState |= ImGui::IsMouseDown(ImGuiMouseButton_Left) << 0U;
-    constants.inputState |= ImGui::IsMouseDown(ImGuiMouseButton_Middle) << 1U;
-    constants.inputState |= ImGui::IsMouseDown(ImGuiMouseButton_Right) << 2U;
-    constants.inputState |= ImGui::IsKeyDown(ImGuiKey_Space) << 3U;
-    constants.inputState |= ImGui::IsKeyDown(ImGuiKey_UpArrow) << 4U;
-    constants.inputState |= ImGui::IsKeyDown(ImGuiKey_LeftArrow) << 5U;
-    constants.inputState |= ImGui::IsKeyDown(ImGuiKey_DownArrow) << 6U;
-    constants.inputState |= ImGui::IsKeyDown(ImGuiKey_RightArrow) << 7U;
-    constants.inputState |= ImGui::IsKeyDown(ImGuiKey_W) << 8U;
-    constants.inputState |= ImGui::IsKeyDown(ImGuiKey_A) << 9U;
-    constants.inputState |= ImGui::IsKeyDown(ImGuiKey_S) << 10U;
-    constants.inputState |= ImGui::IsKeyDown(ImGuiKey_D) << 11U;
+    //// Compute input state
+    //constants.inputState |= ImGui::IsMouseDown(ImGuiMouseButton_Left) << 0U;
+    //constants.inputState |= ImGui::IsMouseDown(ImGuiMouseButton_Middle) << 1U;
+    //constants.inputState |= ImGui::IsMouseDown(ImGuiMouseButton_Right) << 2U;
+    //constants.inputState |= ImGui::IsKeyDown(ImGuiKey_Space) << 3U;
+    //constants.inputState |= ImGui::IsKeyDown(ImGuiKey_UpArrow) << 4U;
+    //constants.inputState |= ImGui::IsKeyDown(ImGuiKey_LeftArrow) << 5U;
+    //constants.inputState |= ImGui::IsKeyDown(ImGuiKey_DownArrow) << 6U;
+    //constants.inputState |= ImGui::IsKeyDown(ImGuiKey_RightArrow) << 7U;
+    //constants.inputState |= ImGui::IsKeyDown(ImGuiKey_W) << 8U;
+    //constants.inputState |= ImGui::IsKeyDown(ImGuiKey_A) << 9U;
+    //constants.inputState |= ImGui::IsKeyDown(ImGuiKey_S) << 10U;
+    //constants.inputState |= ImGui::IsKeyDown(ImGuiKey_D) << 11U;
 
 #ifdef ENABLE_MESH_NODES
     // If the work graph contains mesh nodes, it is created with the
@@ -316,8 +359,15 @@ void SpMV_Application::OnRender(ID3D12GraphicsCommandList10* commandList, const 
         commandList->SetComputeRootDescriptorTable(2, resourceDescriptorHeap_->GetGPUDescriptorHandleForHeapStart());
     }
 
-    //TODO: It won't work until i pass the input record from cpu to gpu (dispatch size)
-    workGraph_->Dispatch(commandList);
+    //modified by mun_ahmd: Passing the dispatch grid size to the GPU
+    //todo some sort of calculation of the grid size based on the active matrix
+    constexpr uint32_t maxDispatchGrid = 1024;
+    uint32_t dispatchGrid = std::min(this->activeSpMV.nrows, maxDispatchGrid);
+    if (this->activeSpMV.nrows > maxDispatchGrid) {
+        throw std::runtime_error("Currently do not support this many rows sorry");
+    }
+    WorkGraph::LaunchRecord record{.dispatchGrid=dispatchGrid};
+    workGraph_->Dispatch(commandList, 1, sizeof(record), &record);
 
     // Transistion writable backbuffer back to pixel shader resource
     {
@@ -887,9 +937,21 @@ struct __TransferCommandListHelper {
     inline static bool isInit = false;
 };
 
+void SpMV_Application::UploadSpMV(CSRMatrix matrix) {
+    //sets & uploads this->activeSpMV to the gpu pretty much
+    this->activeSpMV = matrix;
+    this->UploadCSR(
+        matrix.nrows, matrix.nnz,
+        matrix.rowPtr.data(), matrix.colIdx.data(), matrix.values.data()
+    );
+    assert(matrix.random_vector.size() == matrix.ncols && "The sizes don't match sweetkins");
+    this->UploadVector(matrix.random_vector.size(), matrix.random_vector.data());
+}
+//TODO FIX UPLOAD FUNCTIONS
+//unfortunately I do not feel like making the upload functions coherent
 void SpMV_Application::UploadCSR(
-    unsigned long long numRows,
-    unsigned long long numNonZeroes,
+    uint32_t numRows,
+    uint32_t numNonZeroes,
     const uint32_t* rowPtr,
     const uint32_t* colIdx,
     const float* values)
@@ -980,7 +1042,7 @@ void SpMV_Application::UploadCSR(
 }
 
 
-void SpMV_Application::UploadVector(unsigned long long count, const float* values)
+void SpMV_Application::UploadVector(uint32_t count, const float* values)
 {
     auto device = device_->GetDevice();
     auto cmdList = __TransferCommandListHelper::CreateCommandList(device);

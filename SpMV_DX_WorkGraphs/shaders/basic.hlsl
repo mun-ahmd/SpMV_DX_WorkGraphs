@@ -3,8 +3,8 @@ cbuffer Meta : register(b0)
 {
     uint NumRows;         // number of matrix rows
     uint NumNonZeros;     // number of non-zero entries
-    uint VectorCount;     // length of input/output vector (usually NumRows)
-    uint DispatchX;       // optional dispatch/work grouping info
+    uint VectorCount;     // length of input/output vector (usually NumCols)
+    uint Dummy3;          // padding / reserved
     uint Dummy4;          // padding / reserved
     uint Dummy5;          // padding / reserved
 };

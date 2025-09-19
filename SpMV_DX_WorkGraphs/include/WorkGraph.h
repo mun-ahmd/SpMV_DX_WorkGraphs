@@ -30,6 +30,10 @@
 
 class WorkGraph {
 public:
+    struct LaunchRecord {
+        uint32_t dispatchGrid;
+    };
+
     struct WorkGraphTutorial {
         std::string name;
         std::string shaderFileName;
@@ -48,7 +52,10 @@ public:
               WorkGraphTutorial tutorial,
               bool              sampleSolution);
 
-    void Dispatch(ID3D12GraphicsCommandList10* commandList);
+
+    //modified by mun_ahmd: to allow for passing records to initial node
+    //todo should I change the signature to void* pRecords? :3
+    void Dispatch(ID3D12GraphicsCommandList10* commandList, uint32_t numRecords, uint32_t recordStride, WorkGraph::LaunchRecord* pRecords);
 
     const WorkGraphTutorial& GetTutorial() const;
     bool                     IsSampleSolution() const;

@@ -34,6 +34,19 @@
 
 class SpMV_Application {
 public:
+    struct CSRMatrix {
+        uint32_t nrows;
+        uint32_t ncols;
+        uint32_t nnz;
+
+        std::vector<uint32_t> rowPtr;   // length nrows+1
+        std::vector<uint32_t> colIdx;  // length nnz
+        std::vector<float> values;   // length nnz
+
+        std::vector<float> random_vector; // length ncols
+        std::vector<float> mult_result;   // length nrows
+    };
+
     struct Options {
         std::wstring  title        = L"Work Graph Playground";
         std::uint32_t windowWidth  = 1280;
@@ -75,14 +88,15 @@ private:
     //modified by mun_ahmd: Methods for creating and uploading SpMV buffers
     void CreateSpMVBuffers(uint32_t maxNumRows, uint32_t maxNumCols, uint32_t maxNumNonZeroes);
     //note: it is not really the most efficient to upload both CSR and vector separately since they write some length related meta info to a common buffer
+    void UploadSpMV(CSRMatrix matrix);
     void UploadCSR(
-        unsigned long long numRows,
-        unsigned long long numNonZeroes,
+        uint32_t numRows,
+        uint32_t numNonZeroes,
         const uint32_t* rowPtr,
         const uint32_t* colIdx,
         const float* values
     );
-    void UploadVector(unsigned long long count, const float* values);
+    void UploadVector(uint32_t count, const float* values);
     void CreateWritableBackbuffer(std::uint32_t width, std::uint32_t height);
     void CreateScratchBuffer();
     void CreatePersistentScratchBuffer();
@@ -134,6 +148,9 @@ private:
 
     // Buffer resource containing font atlas
     ComPtr<ID3D12Resource> fontBuffer_;
+
+    //modified by mun_ahmd: Store active SpMV details on CPU
+    CSRMatrix activeSpMV;
 
     // Clear persistent scratch buffer after work graph switch
     bool clearPersistentScratchBuffer_ = true;
