@@ -185,7 +185,7 @@ void Device::ExecuteCurrentFrameCommandList()
     ThrowIfFailed(frameContext.commandList->Close());
 
     // Submit command list
-    commandQueue_->ExecuteCommandLists(
+     commandQueue_->ExecuteCommandLists(
         1, reinterpret_cast<ID3D12CommandList* const*>(frameContext.commandList.GetAddressOf()));
 
     // Incrment signaled fence value & signale fence

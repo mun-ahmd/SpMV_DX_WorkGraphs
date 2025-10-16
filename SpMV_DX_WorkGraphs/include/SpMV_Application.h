@@ -31,22 +31,11 @@
 #include "Swapchain.h"
 #include "Window.h"
 #include "WorkGraph.h"
+#include "SpMV.h"
+
 
 class SpMV_Application {
 public:
-    struct CSRMatrix {
-        uint32_t nrows;
-        uint32_t ncols;
-        uint32_t nnz;
-
-        std::vector<uint32_t> rowPtr;   // length nrows+1
-        std::vector<uint32_t> colIdx;  // length nnz
-        std::vector<float> values;   // length nnz
-
-        std::vector<float> random_vector; // length ncols
-        std::vector<float> mult_result;   // length nrows
-    };
-
     struct Options {
         std::wstring  title        = L"Work Graph Playground";
         std::uint32_t windowWidth  = 1280;
@@ -62,8 +51,8 @@ public:
 #endif
 
         bool forceWarpAdapter         = false;
-        bool enableDebugLayer         = false;
-        bool enableGpuValidationLayer = false;
+        bool enableDebugLayer         = true;
+        bool enableGpuValidationLayer = true;
     };
 
     SpMV_Application(const Options& options);
@@ -72,86 +61,14 @@ public:
     void Run();
 
 private:
-    void OnRender(ID3D12GraphicsCommandList10* commandList, const Swapchain::RenderTarget& renderTarget);
-    void OnRenderUserInterface(ID3D12GraphicsCommandList10* commandList, const Swapchain::RenderTarget& renderTarget);
     void OnResize(std::uint32_t width, std::uint32_t height);
-
-    void CreateImGuiContext();
-    void DestroyImGuiContext();
-
-    void CreateWorkGraphRootSignature();
-    // Creates work graph. Returns if creation was successful
-    bool CreateWorkGraph();
-
-    // Util methods for shader resources
-    void CreateResourceDescriptorHeaps();
-    //modified by mun_ahmd: Methods for creating and uploading SpMV buffers
-    void CreateSpMVBuffers(uint32_t maxNumRows, uint32_t maxNumCols, uint32_t maxNumNonZeroes);
-    //note: it is not really the most efficient to upload both CSR and vector separately since they write some length related meta info to a common buffer
-    void UploadSpMV(CSRMatrix matrix);
-    void UploadCSR(
-        uint32_t numRows,
-        uint32_t numNonZeroes,
-        const uint32_t* rowPtr,
-        const uint32_t* colIdx,
-        const float* values
-    );
-    void UploadVector(uint32_t count, const float* values);
-    void CreateWritableBackbuffer(std::uint32_t width, std::uint32_t height);
-    void CreateScratchBuffer();
-    void CreatePersistentScratchBuffer();
-    void ClearShaderResources(ID3D12GraphicsCommandList10* commandList);
-
-    // Util methods for MSAA
-    void CreateMsaaResources(std::uint32_t width,
-                             std::uint32_t height,
-                             std::uint32_t sampleCount,
-                             std::uint32_t sampleQuality);
-    void ResolveMsaaRenderTarget(ID3D12GraphicsCommandList*     commandList,
-                                 const Swapchain::RenderTarget& swapchainRenderTarget,
-                                 const Swapchain::RenderTarget& msaaRenderTarget);
-
-    void CreateFontBuffer();
 
     std::unique_ptr<Window>    window_;
     std::unique_ptr<Device>    device_;
     std::unique_ptr<Swapchain> swapchain_;
+    std::unique_ptr<SpMV> spmv_;
 
     bool vsync_ = true;
-
-    // Descriptor heap for ImGui
-    ComPtr<ID3D12DescriptorHeap> uiDescriptorHeap_;
-
-    // Descriptor heaps for shader resources
-    ComPtr<ID3D12DescriptorHeap> clearDescriptorHeap_;
-    ComPtr<ID3D12DescriptorHeap> resourceDescriptorHeap_;
-
-    // Multi-sample resources
-    ComPtr<ID3D12Resource>       msaaColorResource_;
-    ComPtr<ID3D12DescriptorHeap> msaaColorDescriptorHeap_;
-    ComPtr<ID3D12Resource>       msaaDepthResource_;
-    ComPtr<ID3D12DescriptorHeap> msaaDepthDescriptorHeap_;
-
-    // Shader resources
-    //modified by mun_ahmd: Added readonly CSR matrix buffer
-    ComPtr<ID3D12Resource> readonlyCSR_rowPtr;
-    ComPtr<ID3D12Resource> readonlyCSR_colIdx;
-    ComPtr<ID3D12Resource> readonlyCSR_values;
-    //modified by mun_ahmd: Added dense vector buffer
-    ComPtr<ID3D12Resource> readonlyVector;
-    //modified by mun_ahmd: Added writeable output vector buffer
-    ComPtr<ID3D12Resource> writeableOutputVector;
-
-    ComPtr<ID3D12Resource> writableBackbuffer_;
-    ComPtr<ID3D12Resource> scratchBuffer_;
-    ComPtr<ID3D12Resource> persistentScratchBuffer_;
-
-    // Buffer resource containing font atlas
-    ComPtr<ID3D12Resource> fontBuffer_;
-
-    //modified by mun_ahmd: Store active SpMV details on CPU
-    CSRMatrix activeSpMV;
-
     // Clear persistent scratch buffer after work graph switch
     bool clearPersistentScratchBuffer_ = true;
 
@@ -159,13 +76,4 @@ private:
     std::chrono::high_resolution_clock::time_point errorMessageEndTime_ = std::chrono::high_resolution_clock::now();
     // Start time of current tutorial. Delta to current time is available in the shader as "Time"
     std::chrono::high_resolution_clock::time_point startTime_           = std::chrono::high_resolution_clock::now();
-
-    std::vector<WorkGraph::WorkGraphTutorial> workGraphTutorials_;
-
-    // Work Graph resources
-    std::unique_ptr<ShaderCompiler> shaderCompiler_;
-    ComPtr<ID3D12RootSignature>     workGraphRootSignature_;
-    WorkGraph::WorkGraphTutorial    workGraphTutorial_;
-    bool                            workGraphUseSampleSolution_ = false;
-    std::unique_ptr<WorkGraph>      workGraph_;
 };

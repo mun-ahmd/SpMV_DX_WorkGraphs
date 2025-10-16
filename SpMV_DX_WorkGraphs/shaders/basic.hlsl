@@ -3,11 +3,9 @@ cbuffer Meta : register(b0)
 {
     uint NumRows;         // number of matrix rows
     uint NumNonZeros;     // number of non-zero entries
-    uint VectorCount;     // length of input/output vector (usually NumCols)
-    uint Dummy3;          // padding / reserved
-    uint Dummy4;          // padding / reserved
-    uint Dummy5;          // padding / reserved
+    uint NumCols;     // length of input/output vector (usually NumCols)
 };
+
 
 // ---- read-only CSR arrays (SRVs) ----
 // RowPtr has (NumRows + 1) entries of uint
@@ -26,16 +24,12 @@ StructuredBuffer<float> InVector : register(t3);
 // Output vector (one float per row)
 RWStructuredBuffer<float> OutVector      : register(u0);
 
-//// Optional: writable color backbuffer (if you write a texture)
-//RWTexture2D<float4>       WritableBackbuffer : register(u1);
-
-//// If you have additional UAVs, use u2, u3, ...
-//RWStructuredBuffer<uint>  DebugCounter    : register(u2); // example
 
 struct EntryRecord
 {
-    uint  dispatchGrid : SV_DispatchGrid;
+    uint3  dispatchGrid : SV_DispatchGrid;
 };
+
 
 struct CSRRow{
     uint rowId;
@@ -43,11 +37,14 @@ struct CSRRow{
     uint numValues;
 };
 
+//below sets a theoretical limit on the number of rows this can process
+//  limit should be max dispatch grid size * 4
+#define MAX_ROWS_PER_THREAD 4
 
 [Shader("node")]
 [NodeIsProgramEntry]
 [NodeLaunch("broadcasting")]
-[NodeMaxDispatchGrid(1024, 1, 1)]
+[NodeMaxDispatchGrid(32, 1, 1)]
 [NumThreads(32, 1, 1)]
 [NodeId("Entry", 0)]
 void EntryFunction(
@@ -55,35 +52,49 @@ void EntryFunction(
 
     uint3 dispatchThreadId : SV_DispatchThreadID,
     
-    [MaxRecords(1)]
+    [MaxRecords(32 * MAX_ROWS_PER_THREAD)]
     [NodeId("MultiplyRow")]
     NodeOutput<CSRRow> csrRowOutput
 )
 {
-    //one thread per row (ideally)
-    for(uint rowIdx = dispatchThreadId.x; rowIdx < NumRows; rowIdx += (inputRecord.Get().dispatchGrid * 32)){
-        //grid parallel for loop -> needs adjustment for work graphs
-        //Warning: Since the MaxRecords is currently 1, it will fail for second iteration
-        //Warning: Since these launch ops are required to be run by every thread together, it could fail in case of a second iteration: So this is really unsafe code
+    uint dispatchGrid = inputRecord.Get().dispatchGrid.x;
+    
+    //Thread processes nothing if there are too many, otherwise it is grid parallel
+    const uint numThreadOutputs = (dispatchThreadId.x >= NumRows) ? 0 : (1 + (
+        max(NumRows - dispatchThreadId.x - 1, 0) / (dispatchGrid * 32)
+    ));
+    //if(dispatchThreadId.x < NumRows){
+    //    OutVector[dispatchThreadId.x] = float(numThreadOutputs);
+    //}
+    //return;
+    ThreadNodeOutputRecords<CSRRow> multiplyOutputs = 
+        csrRowOutput.GetThreadNodeOutputRecords(
+            numThreadOutputs
+        );
 
-        //version 1: Launch the MultiplyRow for every row
+    //one thread per few rows (ideally)
+    //grid parallel loop
+    for(uint outputIdx = 0; outputIdx < numThreadOutputs; outputIdx++){
+        uint rowIdx = dispatchThreadId.x + (outputIdx * dispatchGrid * 32);
+   //version 1: Launch the MultiplyRow for every row
         uint rowPtr = RowPtr[rowIdx];
-        //note this assumes that rowIdx will max out at NumRows - 1
-        //  should you just read both values into shared memory
-        //      I think that is over optimization
         uint numValuesInRow = RowPtr[rowIdx + 1] - rowPtr;
 
-        ThreadNodeOutputRecords<CSRRow> multiplyOutputs =
-        csrRowOutput.GetThreadNodeOutputRecords(1);
-        multiplyOutputs.Get().rowId = rowIdx;
-        multiplyOutputs.Get().rowPtr = rowPtr;
-        multiplyOutputs.Get().numValues = numValuesInRow;
-        multiplyOutputs.OutputComplete();
+        multiplyOutputs.Get(outputIdx).rowId = rowIdx;
+        multiplyOutputs.Get(outputIdx).rowPtr = rowPtr;
+        multiplyOutputs.Get(outputIdx).numValues = numValuesInRow;
 
         //version 2: Launch the MultiplyRow for every long row
         //todo
-
     }
+    
+    //while this is okay, it might be worth it to figure out
+    //  how to call output complete every iteration
+    //      why? -> so that the multiplies can be scheduled earlier instead of being serial pretty much
+    //          okay they are not exactly serial in this case either due to oversubscription
+    //              the tail effect should be minimized in this case too
+    multiplyOutputs.OutputComplete();
+    return;
 }
 
 groupshared float mult_results[32];

@@ -30,7 +30,7 @@
 #include "Window.h"
 #include "Swapchain.h"
 
-WorkGraph::WorkGraph(const Device*        device,
+WorkGraph::WorkGraph(ID3D12Device9*        device,
                      ShaderCompiler*      shaderCompiler,
                      ID3D12RootSignature* rootSignature,
 #ifdef ENABLE_MESH_NODES
@@ -189,7 +189,7 @@ WorkGraph::WorkGraph(const Device*        device,
 #endif
 
     // Create work graph state object
-    ThrowIfFailed(device->GetDevice()->CreateStateObject(stateObjectDesc, IID_PPV_ARGS(&stateObject_)));
+    ThrowIfFailed(device->CreateStateObject(stateObjectDesc, IID_PPV_ARGS(&stateObject_)));
 
     // release all compiled shaders
     compiledShaders.clear();
@@ -223,7 +223,7 @@ WorkGraph::WorkGraph(const Device*        device,
         CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
         CD3DX12_RESOURCE_DESC   resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(memoryRequirements.MaxSizeInBytes,
                                                                            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        ThrowIfFailed(device->GetDevice()->CreateCommittedResource(&heapProperties,
+        ThrowIfFailed(device->CreateCommittedResource(&heapProperties,
                                                                    D3D12_HEAP_FLAG_NONE,
                                                                    &resourceDesc,
                                                                    D3D12_RESOURCE_STATE_COMMON,
@@ -248,7 +248,17 @@ WorkGraph::WorkGraph(const Device*        device,
     // The D3D12_DISPATCH_GRAPH_DESC uses entrypoint indices instead of string-based node IDs to reference the enty
     // node. GetEntrypointIndex allows us to translate from a node ID (i.e., node name and node array index) to an
     // entrypoint index. See https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#getentrypointindex
+   //modified by mun_ahmd: the EmptyRecord input rule is lifted, but it still is required to be named "Entry"
     entryPointIndex_ = workGraphProperties->GetEntrypointIndex(workGraphIndex, {L"Entry", 0});
+
+    {
+        //for funsies
+        std::cout << std::endl << "WorkGraph Input Record thingies:\n\t";
+        std::cout << workGraphProperties->GetEntrypointRecordSizeInBytes(workGraphIndex, entryPointIndex_);
+        std::cout << "\n\t";
+        std::cout << workGraphProperties->GetEntrypointRecordAlignmentInBytes(workGraphIndex, entryPointIndex_);
+        std::cout << std::endl;
+    }
 
     // Check if entrypoint was found.
     if (entryPointIndex_ == 0xFFFFFFFFU) {

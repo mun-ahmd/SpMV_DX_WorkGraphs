@@ -141,6 +141,8 @@ std::pair<ComPtr<IDxcBlob>, std::vector<std::string>> ShaderCompiler::CompileSha
         // use HLSL 2021
         L"-HV",
         L"2021",
+        //modified by mun_ahmd: added Wall
+        L"-Wall",
 #if ENABLE_MESH_NODES
         // Mesh Nodes use experimental shader model 6.9, which is not supported by external DXIL validation
         L"-select-validator",
@@ -229,6 +231,15 @@ std::pair<ComPtr<IDxcBlob>, std::vector<std::string>> ShaderCompiler::CompileSha
         stream << ":\n" << errorString;
 
         throw std::runtime_error(stream.str());
+    }
+    else {
+        std::stringstream stream;
+        stream << "Successfully compiled shader with warnings: \"" << shaderFile << "\" as " << ConvertWStringToString(target);
+        if (entryPoint) {
+            stream << " for entry point \"" << ConvertWStringToString(entryPoint) << "\"";
+        }
+        stream << ":\n" << errorString;
+        std::cout << stream.str();
     }
 
     ComPtr<IDxcBlob> outputBlob;

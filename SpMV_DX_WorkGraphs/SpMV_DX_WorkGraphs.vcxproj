@@ -148,6 +148,7 @@
     <ClCompile Include="src\main-playground.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\ShaderCompiler.cpp" />
+    <ClCompile Include="src\SpMV.cpp" />
     <ClCompile Include="src\SpMV_Application.cpp" />
     <ClCompile Include="src\Swapchain.cpp" />
     <ClCompile Include="src\Window.cpp" />
@@ -155,7 +156,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Device.h" />
+    <ClInclude Include="include\MathHelpers.h" />
     <ClInclude Include="include\ShaderCompiler.h" />
+    <ClInclude Include="include\SpMV.h" />
     <ClInclude Include="include\SpMV_Application.h" />
     <ClInclude Include="include\Swapchain.h" />
     <ClInclude Include="include\Window.h" />

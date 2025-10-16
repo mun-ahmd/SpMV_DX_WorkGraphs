@@ -31,7 +31,9 @@
 class WorkGraph {
 public:
     struct LaunchRecord {
-        uint32_t dispatchGrid;
+        uint32_t dispatchGridX;
+        uint32_t dispatchGridY;
+        uint32_t dispatchGridZ;
     };
 
     struct WorkGraphTutorial {
@@ -43,7 +45,7 @@ public:
         bool operator==(const WorkGraphTutorial&) const = default;
     };
 
-    WorkGraph(const Device*        device,
+    WorkGraph(ID3D12Device9*        device,
               ShaderCompiler*      shaderCompiler,
               ID3D12RootSignature* rootSignature,
 #ifdef ENABLE_MESH_NODES

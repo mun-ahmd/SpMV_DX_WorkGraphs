@@ -32,6 +32,8 @@
 #include "Window.h"
 #include "WorkGraph.h"
 
+#define TUTORIAL_FOLDER_LIST "apples"
+
 class Application {
 public:
     struct Options {
