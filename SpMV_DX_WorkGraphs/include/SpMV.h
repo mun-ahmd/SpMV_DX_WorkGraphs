@@ -62,12 +62,16 @@ public:
 			uint32_t NumRows;
 			uint32_t NumNonZeros;     // number of non-zero entries
 			uint32_t VectorCount;     // length of input vector (usually NumCols)
+			uint32_t MaxRowsPerThread;  // Maximum number of rows a single thread can process
+			uint32_t NumElementsInDenseRow; //how many elements should be in a matrix row for it to be considered dense
 		};
 
 		RootConstants constants = {
 			.NumRows = this->active.nrows,
 			.NumNonZeros = this->active.nnz,
-			.VectorCount = this->active.ncols
+			.VectorCount = this->active.ncols,
+			.MaxRowsPerThread = 4,
+			.NumElementsInDenseRow = (static_cast<uint32_t>(this->active.ncols/3))	//25% full
 		};
 
 		{
@@ -75,7 +79,7 @@ public:
 			commandList->SetComputeRootSignature(workgraph.rootSignature.Get());
 
 			// Set root constants
-			commandList->SetComputeRoot32BitConstants(0, 3, &constants, 0);
+			commandList->SetComputeRoot32BitConstants(0, 5, &constants, 0);
 
 			// Set descriptor heap & table
 			commandList->SetDescriptorHeaps(1, descriptorHeap.GetAddressOf());
@@ -431,7 +435,6 @@ private:
 	}
 
 	void initWorkGraph(ID3D12Device9* device) {
-		//do this pls
 		//create signature
 		{
 			CD3DX12_DESCRIPTOR_RANGE descriptorRanges[1]{};
@@ -439,7 +442,7 @@ private:
 			//descriptorRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND); // 1 UAV -> u0, at heap[4]
 
 			std::array<CD3DX12_ROOT_PARAMETER, 3> rootParameters{};
-			rootParameters[0].InitAsConstants(3, 0);  // 3 DWORDs at register b0, space 0
+			rootParameters[0].InitAsConstants(5, 0);  // 5 DWORDs at register b0, space 0
 			rootParameters[1].InitAsDescriptorTable(1, descriptorRanges);
 			rootParameters[2].InitAsUnorderedAccessView(0);
 
@@ -465,7 +468,8 @@ private:
 					shaderCompiler.get(),
 					workgraph.rootSignature.Get(),
 					workgraph.tutorial,
-					false
+					false,
+					L"EntryV2"
 				);
 			}
 			catch (const std::exception& e) {

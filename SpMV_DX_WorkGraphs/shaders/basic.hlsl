@@ -1,9 +1,12 @@
-// ---- push constants (root constants) -> InitAsConstants(6, 0) ----
+// ---- push constants (root constants) ----
 cbuffer Meta : register(b0)
 {
     uint NumRows;         // number of matrix rows
     uint NumNonZeros;     // number of non-zero entries
     uint NumCols;     // length of input/output vector (usually NumCols)
+    uint MaxRowsPerThread;  // Maximum number of rows a single thread can process
+    //Note: above does nothing please fix later (the define works instead)
+    uint NumElementsInDenseRow; //how many elements should be in a matrix row for it to be considered dense
 };
 
 
@@ -37,6 +40,7 @@ struct CSRRow{
     uint numValues;
 };
 
+// todo change the defines to constants in the Root Constants
 //below sets a theoretical limit on the number of rows this can process
 //  limit should be max dispatch grid size * 4
 #define MAX_ROWS_PER_THREAD 4
@@ -46,8 +50,8 @@ struct CSRRow{
 [NodeLaunch("broadcasting")]
 [NodeMaxDispatchGrid(32, 1, 1)]
 [NumThreads(32, 1, 1)]
-[NodeId("Entry", 0)]
-void EntryFunction(
+[NodeId("EntryV1", 0)]
+void EntryFunctionV1(
     DispatchNodeInputRecord<EntryRecord> inputRecord,
 
     uint3 dispatchThreadId : SV_DispatchThreadID,
@@ -83,9 +87,6 @@ void EntryFunction(
         multiplyOutputs.Get(outputIdx).rowId = rowIdx;
         multiplyOutputs.Get(outputIdx).rowPtr = rowPtr;
         multiplyOutputs.Get(outputIdx).numValues = numValuesInRow;
-
-        //version 2: Launch the MultiplyRow for every long row
-        //todo
     }
     
     //while this is okay, it might be worth it to figure out
@@ -93,6 +94,76 @@ void EntryFunction(
     //      why? -> so that the multiplies can be scheduled earlier instead of being serial pretty much
     //          okay they are not exactly serial in this case either due to oversubscription
     //              the tail effect should be minimized in this case too
+    multiplyOutputs.OutputComplete();
+    return;
+}
+
+//version2 should perform better
+[Shader("node")]
+[NodeIsProgramEntry]
+[NodeLaunch("broadcasting")]
+[NodeMaxDispatchGrid(32, 1, 1)]
+[NumThreads(32, 1, 1)]
+[NodeId("EntryV2", 0)]
+void EntryFunctionV2(
+    DispatchNodeInputRecord<EntryRecord> inputRecord,
+
+    uint3 dispatchThreadId : SV_DispatchThreadID,
+    
+    [MaxRecords(32 * MAX_ROWS_PER_THREAD)]
+    [NodeId("MultiplyRow")]
+    NodeOutput<CSRRow> csrRowOutput
+)
+{
+    uint dispatchGrid = inputRecord.Get().dispatchGrid.x;
+    
+    //Thread processes nothing if there are too many, otherwise it is grid parallel
+    //Number of rows processed by this thread
+    const uint numThreadRows = (dispatchThreadId.x >= NumRows) ? 0 : (1 + (
+        max(NumRows - dispatchThreadId.x - 1, 0) / (dispatchGrid * 32)
+    ));
+
+    uint numThreadOutputs = 0;
+    //Count the number of long rows (i.e the number of output records from this thread)
+    for(uint outputIdx = 0; outputIdx < numThreadRows; outputIdx++){
+        uint rowIdx = dispatchThreadId.x + (outputIdx * dispatchGrid * 32);
+    
+        uint rowPtr = RowPtr[rowIdx];
+        uint numValuesInRow = RowPtr[rowIdx + 1] - rowPtr;
+
+        numThreadOutputs += (numValuesInRow >= NumElementsInDenseRow) ? 1 : 0;
+    }
+
+    ThreadNodeOutputRecords<CSRRow> multiplyOutputs = 
+        csrRowOutput.GetThreadNodeOutputRecords(
+            numThreadOutputs
+        );
+
+    //for fun writing unreadable code
+    //now numThreadOutputs is an index into the outputs
+    numThreadOutputs-=1;
+    for(uint outputIdx = 0; outputIdx < numThreadRows; outputIdx++){
+        uint rowIdx = dispatchThreadId.x + (outputIdx * dispatchGrid * 32);
+        //version 2: Launch the MultiplyRow for every long row
+        uint rowPtr = RowPtr[rowIdx];
+        uint numValuesInRow = RowPtr[rowIdx + 1] - rowPtr;
+
+        if (numValuesInRow >= NumElementsInDenseRow) {
+            multiplyOutputs.Get(numThreadOutputs).rowId = rowIdx;
+            multiplyOutputs.Get(numThreadOutputs).rowPtr = rowPtr;
+            multiplyOutputs.Get(numThreadOutputs).numValues = numValuesInRow;
+            numThreadOutputs -= 1;
+        }
+        else{
+            //Process the row inline
+            float mult_acc = 0.0f;
+            for(int mult_i = 0; mult_i < numValuesInRow; mult_i++){
+                mult_acc += InVector[ColIdx[rowPtr + mult_i]] * Values[rowPtr + mult_i];
+            }
+            OutVector[rowIdx] = mult_acc;
+        }
+    }
+    
     multiplyOutputs.OutputComplete();
     return;
 }

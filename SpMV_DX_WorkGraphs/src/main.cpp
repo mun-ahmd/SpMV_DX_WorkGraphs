@@ -66,6 +66,16 @@ int main(int argc, char* argv[])
             return true;
         };
 
+        if (argIdx == 1) {
+            options.inputCSRBinFile = std::filesystem::path(arg);
+            if ((!std::filesystem::exists(options.inputCSRBinFile)) || (options.inputCSRBinFile.extension() != ".csrbin")) {
+                std::cerr << "invalid input csrbin filepath: " << arg << std::endl;
+                exit(2);
+            }
+            else {
+                continue;
+            }
+        }
         if (ArgumentFlag("--forceWarpAdapter", options.forceWarpAdapter)) {
             continue;
         }
@@ -75,85 +85,21 @@ int main(int argc, char* argv[])
         if (ArgumentFlag("--enableGpuValidationLayer", options.enableGpuValidationLayer)) {
             continue;
         }
-        if (std::uint32_t tutorialIndex = 0; ArgumentUint("--tutorial", tutorialIndex)) {
-            if (tutorialIndex >= options.tutorials.size()) {
-                std::cerr << "Tutorial index is out of range. Use --tutorial to select index in range 0-"
-                          << (options.tutorials.size() - 1) << std::endl;
-
-                exit(1);
-            }
-
-            options.tutorial = options.tutorials[tutorialIndex];
-            continue;
-        }
-#ifdef ENABLE_MESH_NODES
-        if (ArgumentUint("--msaa", options.renderTargetSampleCount)) {
-            continue;
-        }
-#endif
-
         if (arg == "-h"s || arg == "--help"s) {
-            std::cout << "Work Graph Playground\n";
-            std::cout << "Usage: WorkGraphPlayground.exe [OPTIONS] [path]\n\n";
+            std::cout << "SpMV Multiplier using DX12 Work Graphs\n";
+            std::cout << "Usage: SpMV_WorkGraphs.exe [OPTIONS] [path]\n\n";
             std::cout << "Positionals:\n";
-            std::cout << "  path                       Path to a .hlsl playground tutorial file.\n\n";
+            std::cout << "  path                       Path to a .csrbin SpMV example file (see PreprocessCSR.py).\n\n";
             std::cout << "Options:\n";
             std::cout << "  -h,--help                  Print this help message and exit.\n";
             std::cout << "  --forceWarpAdapter         Force usage of software WARP adapter instead of GPU.\n";
             std::cout << "  --enableDebugLayer         Enable D3D Debug Layer.\n";
             std::cout << "  --enableGpuValidationLayer Enable D3D GPU Validation Layer.\n";
-            std::cout << "  --tutorial UINT            Select tutorial to start with.\n";
-            if (options.tutorials.empty()) {
-                std::cout << "                               No tutorials found. Please check to make sure at least "
-                             "one tutorial file is present in the "
-                             "following folders:\n";
-            } else {
-                for (std::uint32_t tutorialIndex = 0; tutorialIndex < options.tutorials.size(); ++tutorialIndex) {
-                    std::cout << "                               [" << std::setw(2) << tutorialIndex << "] "
-                              << options.tutorials[tutorialIndex].name << "\n";
-                }
-            }
-#ifdef ENABLE_MESH_NODES
-            std::cout << "  --msaa UINT                Number of samples in mesh node render target. Default = 1.\n";
-#endif
-
             exit(0);
         }
-
-        // Check if tutorial file was selected via path
-        //if ((argIdx == (argc - 1)) && std::filesystem::exists(arg)) {
-        //    // check if "--tutorial" argument was set
-        //    if (options.tutorial.has_value()) {
-        //        std::cerr << "Tutorial already selected with --tutorial argument." << std::endl;
-
-        //        exit(1);
-        //    }
-
-        //    auto tutorial = LoadTutorial(arg, true);
-
-        //    if (!tutorial.has_value()) {
-        //        std::cerr << "Failed to load tutorial from file \"" << arg << "\"." << std::endl;
-
-        //        exit(1);
-        //    }
-
-        //    options.tutorials.insert(options.tutorials.begin(), *tutorial);
-        //    options.tutorial = *tutorial;
-
-        //    continue;
-        //}
-        
         std::cerr << "Unknown argument \"" << arg << "\"." << std::endl;
         exit(1);
     }
-
-    {
-        auto shader_path = std::filesystem::path("./shaders/basic.hlsl");
-        auto tutorial = LoadShader(shader_path);
-        options.tutorials.insert(options.tutorials.begin(), *tutorial);
-        options.tutorial = *tutorial;
-    }
-
 
     try {
         SpMV_Application app(options);
@@ -173,124 +119,4 @@ int main(int argc, char* argv[])
     }
 
     return 0;
-}
-
-//modified by mun_ahmd
-std::optional<WorkGraph::WorkGraphTutorial> LoadShader(const std::filesystem::path& sourceFilePath) {
-    //No solutions lets go
-    const auto stem = sourceFilePath.stem().string();
-
-    std::stringstream nameStream;
-
-    // Compute tutorial name
-    {
-        bool lastUpper = true;
-        bool lastAlpha = true;
-
-        for (const auto c : stem) {
-            const auto upper = std::isupper(c);
-            const auto alpha = std::isupper(c);
-
-            // Insert space between camel-case names
-            if (upper && !lastUpper) {
-                nameStream << " ";
-            }
-
-            nameStream << c;
-
-            lastUpper = upper;
-            lastAlpha = alpha;
-        }
-    }
-
-    WorkGraph::WorkGraphTutorial tutorial = {};
-    tutorial.name = nameStream.str();
-    tutorial.shaderFileName =
-        std::filesystem::proximate(sourceFilePath, std::filesystem::current_path()).generic_string();
-
-    return tutorial;
-
-}
-
-std::optional<WorkGraph::WorkGraphTutorial> LoadTutorial(const std::filesystem::path& sourceFilePath,
-                                                         const bool                   allowSolution)
-{
-    // Ignore non-HLSL files
-    if (sourceFilePath.extension() != ".hlsl") {
-        return std::nullopt;
-    }
-    // Ignore solution
-    if (sourceFilePath.stem().string().ends_with("Solution") && !allowSolution) {
-        return std::nullopt;
-    }
-
-    const auto stem = sourceFilePath.stem().string();
-
-    std::stringstream nameStream;
-
-    // Compute tutorial name
-    {
-        bool lastUpper = true;
-        bool lastAlpha = true;
-
-        for (const auto c : stem) {
-            const auto upper = std::isupper(c);
-            const auto alpha = std::isupper(c);
-
-            // Insert space between camel-case names
-            if (upper && !lastUpper) {
-                nameStream << " ";
-            }
-
-            nameStream << c;
-
-            lastUpper = upper;
-            lastAlpha = alpha;
-        }
-    }
-
-    WorkGraph::WorkGraphTutorial tutorial = {};
-    tutorial.name                         = nameStream.str();
-    tutorial.shaderFileName =
-        std::filesystem::proximate(sourceFilePath, std::filesystem::current_path()).generic_string();
-
-    const auto solutionFilename = sourceFilePath.parent_path() / (stem + "Solution.hlsl");
-
-    if (std::filesystem::exists(solutionFilename)) {
-        tutorial.solutionShaderFileName =
-            std::filesystem::proximate(solutionFilename, std::filesystem::current_path()).generic_string();
-    }
-
-    return tutorial;
-}
-
-std::vector<WorkGraph::WorkGraphTutorial> LoadTutorials()
-{
-    std::vector<WorkGraph::WorkGraphTutorial> result;
-
-    for (const auto& [tutorialFolder, tutorialPrefix] : {std::make_pair("NoFolder", "NoTutorialsFolderYay")}) {
-        if (!std::filesystem::exists(tutorialFolder)) {
-            continue;
-        }
-
-        // Numbering of tutorials resets for every folder
-        std::uint32_t tutorialIndex = 0;
-
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(tutorialFolder)) {
-            const auto& path = entry.path();
-
-            auto tutorial = LoadTutorial(entry.path());
-
-            if (tutorial.has_value()) {
-                std::stringstream namePrefixStream;
-                namePrefixStream << tutorialPrefix << " " << tutorialIndex++ << ": " << tutorial->name;
-
-                tutorial->name = namePrefixStream.str();
-
-                result.emplace_back(std::move(*tutorial));
-            }
-        }
-    }
-
-    return result;
 }

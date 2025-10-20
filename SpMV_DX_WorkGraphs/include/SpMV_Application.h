@@ -28,8 +28,6 @@
 
 #include "Device.h"
 #include "ShaderCompiler.h"
-#include "Swapchain.h"
-#include "Window.h"
 #include "WorkGraph.h"
 #include "SpMV.h"
 
@@ -37,23 +35,11 @@
 class SpMV_Application {
 public:
     struct Options {
-        std::wstring  title        = L"Work Graph Playground";
-        std::uint32_t windowWidth  = 1280;
-        std::uint32_t windowHeight = 720;
-
-        std::vector<WorkGraph::WorkGraphTutorial> tutorials;
-
-        std::optional<WorkGraph::WorkGraphTutorial> tutorial;
-
-#ifdef ENABLE_MESH_NODES
-        // MSAA sample count for render target
-        std::uint32_t renderTargetSampleCount = 1;
-#endif
-
+        std::filesystem::path inputCSRBinFile;
         bool forceWarpAdapter         = false;
         bool enableDebugLayer         = true;
         bool enableGpuValidationLayer = true;
-    };
+    } options;
 
     SpMV_Application(const Options& options);
     ~SpMV_Application();
@@ -61,16 +47,8 @@ public:
     void Run();
 
 private:
-    void OnResize(std::uint32_t width, std::uint32_t height);
-
-    std::unique_ptr<Window>    window_;
     std::unique_ptr<Device>    device_;
-    std::unique_ptr<Swapchain> swapchain_;
     std::unique_ptr<SpMV> spmv_;
-
-    bool vsync_ = true;
-    // Clear persistent scratch buffer after work graph switch
-    bool clearPersistentScratchBuffer_ = true;
 
     // Timeout to show compilation error message
     std::chrono::high_resolution_clock::time_point errorMessageEndTime_ = std::chrono::high_resolution_clock::now();

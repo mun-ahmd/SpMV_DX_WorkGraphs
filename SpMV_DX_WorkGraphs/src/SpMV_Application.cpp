@@ -202,15 +202,19 @@ static SpMV::SpMVData LoadCSRBinFile(const std::string& csrbinFilePath) {
     return mat;
 }
 
-SpMV_Application::SpMV_Application(const Options& options)
+SpMV_Application::SpMV_Application(const Options& options) : options(options)
 {
-    window_ = std::make_unique<Window>(options.title, options.windowWidth, options.windowHeight);
-    device_ =
-        std::make_unique<Device>(options.forceWarpAdapter, options.enableDebugLayer, options.enableGpuValidationLayer);
-    swapchain_ = std::make_unique<Swapchain>(device_.get(), window_.get());
+    device_ = std::make_unique<Device>(
+        options.forceWarpAdapter,
+        options.enableDebugLayer,
+        options.enableGpuValidationLayer
+    );
     spmv_ = std::make_unique<SpMV>();
     device_->WaitForDevice();
-    spmv_->init(device_->GetDevice(), std::make_unique<ShaderCompiler>(device_.get()));
+    spmv_->init(
+        device_->GetDevice(),
+        std::make_unique<ShaderCompiler>(device_.get())
+    );
 }
 
 SpMV_Application::~SpMV_Application()
@@ -219,62 +223,33 @@ SpMV_Application::~SpMV_Application()
 
 void SpMV_Application::Run()
 {
-    
     //set the active data
     auto* commandList = device_->GetNextFrameCommandList();
-    spmv_->setActiveSpMV(device_->GetDevice(), commandList, LoadCSRBinFile("./matrices/1138_bus.csrbin"));
+    spmv_->setActiveSpMV(device_->GetDevice(), commandList, LoadCSRBinFile(options.inputCSRBinFile.generic_string()));
     device_->ExecuteCurrentFrameCommandList();
     device_->WaitForDevice();
     //the below line of code is a terrible secret
     SpMV::theForbiddenUploadBufferVector.clear();
 
-    do {
-        // Check if resize is needed
-        if ((window_->GetWidth() != swapchain_->GetWidth()) ||  //
-            (window_->GetHeight() != swapchain_->GetHeight()))
-        {
-            // Resize swapchain
-            OnResize(window_->GetWidth(), window_->GetHeight());
-        }
-
-        // Render window
-        commandList = device_->GetNextFrameCommandList();
-        const auto renderTarget = swapchain_->GetNextRenderTarget();        
-        device_->ExecuteCurrentFrameCommandList();
-        device_->WaitForDevice();
+    //todo remove the render loop and all rendering
+    //  add function to save the output vector
+    //  add timing events and save them alongside the output vector
 
         // Perform SpMV compute
-        commandList = device_->GetNextFrameCommandList();
-        spmv_->runGraph(commandList);
-        device_->ExecuteCurrentFrameCommandList();
-        device_->WaitForDevice();
-
-        // Copy results to cpu
-        commandList = device_->GetNextFrameCommandList();
-        spmv_->copyResults(commandList);
-        device_->ExecuteCurrentFrameCommandList();
-        device_->WaitForDevice();
-
-        {
-            auto results = spmv_->getResultsOnCPU();
-            results.clear();
-        }
-
-        swapchain_->Present(vsync_);
-    } while (window_->HandleEvents());
-
+    commandList = device_->GetNextFrameCommandList();
+    spmv_->runGraph(commandList);
+    device_->ExecuteCurrentFrameCommandList();
     device_->WaitForDevice();
-}
 
-void SpMV_Application::OnResize(std::uint32_t width, std::uint32_t height)
-{
-    // If window is minimized, size is set to 0x0, thus we ignore this resize and render to the old resolution instead.
-    if ((width == 0) || (height == 0)) {
-        return;
+    // Copy results to cpu
+    commandList = device_->GetNextFrameCommandList();
+    spmv_->copyResults(commandList);
+    device_->ExecuteCurrentFrameCommandList();
+    device_->WaitForDevice();
+
+    {
+        auto results = spmv_->getResultsOnCPU();
+        results.clear();
     }
-
-    // Wait for all frames in flight
     device_->WaitForDevice();
-
-    swapchain_->Resize(width, height);
 }

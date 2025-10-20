@@ -52,7 +52,7 @@ public:
               DXGI_SAMPLE_DESC renderTargetSampleDesc,
 #endif
               WorkGraphTutorial tutorial,
-              bool              sampleSolution);
+              bool              sampleSolution, const wchar_t* EntryPointNodeName);
 
 
     //modified by mun_ahmd: to allow for passing records to initial node

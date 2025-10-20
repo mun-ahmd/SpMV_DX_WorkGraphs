@@ -37,7 +37,7 @@ WorkGraph::WorkGraph(ID3D12Device9*        device,
                      DXGI_SAMPLE_DESC renderTargetSampleDesc,
 #endif
                      WorkGraphTutorial tutorial,
-                     const bool        sampleSolution)
+                     const bool        sampleSolution, const wchar_t* EntryPointNodeName)
     : tutorial_(std::move(tutorial)), sampleSolution_(sampleSolution)
 {
     // Name for work graph program inside the state object
@@ -248,16 +248,16 @@ WorkGraph::WorkGraph(ID3D12Device9*        device,
     // The D3D12_DISPATCH_GRAPH_DESC uses entrypoint indices instead of string-based node IDs to reference the enty
     // node. GetEntrypointIndex allows us to translate from a node ID (i.e., node name and node array index) to an
     // entrypoint index. See https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#getentrypointindex
-   //modified by mun_ahmd: the EmptyRecord input rule is lifted, but it still is required to be named "Entry"
-    entryPointIndex_ = workGraphProperties->GetEntrypointIndex(workGraphIndex, {L"Entry", 0});
+   //modified by mun_ahmd: the EmptyRecord input rule is lifted, and custom entrypoint names can be provided
+    entryPointIndex_ = workGraphProperties->GetEntrypointIndex(workGraphIndex, {EntryPointNodeName, 0});
 
     {
         //for funsies
-        std::cout << std::endl << "WorkGraph Input Record thingies:\n\t";
-        std::cout << workGraphProperties->GetEntrypointRecordSizeInBytes(workGraphIndex, entryPointIndex_);
-        std::cout << "\n\t";
-        std::cout << workGraphProperties->GetEntrypointRecordAlignmentInBytes(workGraphIndex, entryPointIndex_);
-        std::cout << std::endl;
+        //std::cout << std::endl << "WorkGraph Input Record thingies:\n\t";
+        //std::cout << workGraphProperties->GetEntrypointRecordSizeInBytes(workGraphIndex, entryPointIndex_);
+        //std::cout << "\n\t";
+        //std::cout << workGraphProperties->GetEntrypointRecordAlignmentInBytes(workGraphIndex, entryPointIndex_);
+        //std::cout << std::endl;
     }
 
     // Check if entrypoint was found.
